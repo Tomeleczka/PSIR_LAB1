@@ -61,6 +61,12 @@ int main() {
         broadcast_addr.sin_addr.s_addr = inet_addr("255.255.255.255"); // Adres rozgłoszeniowy
         broadcast_addr.sin_port = htons(UDP_PORT);
 
+        int broadcastEnable = 1;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable)) < 0) {
+            perror("Błąd ustawiania trybu broadcastu");
+            exit(EXIT_FAILURE);
+        }
+
         // Kod wysyłania wiadomości HELLO
         if (sendto(sockfd, hello_message, strlen(hello_message), 0, (struct sockaddr *)&broadcast_addr, sizeof(broadcast_addr)) < 0) {
             perror("Błąd podczas wysyłania wiadomości HELLO");
