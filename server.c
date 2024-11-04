@@ -62,7 +62,7 @@ int main() {
         broadcast_addr.sin_port = htons(UDP_PORT);
 
         sendto(sockfd, hello_message, strlen(hello_message), 0, (struct sockaddr *)&broadcast_addr, sizeof(broadcast_addr));
-        printf("Wysłanie wiadomości HELLO!")
+        printf("Wysłanie wiadomości HELLO!");
         // Odbieranie dowolnej przychodzącej wiadomości
         int received_len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&client_addr, &addr_len);
         buffer[received_len] = '\0';
