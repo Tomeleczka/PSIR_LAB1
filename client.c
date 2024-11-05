@@ -103,6 +103,12 @@ int main() {
         exit(0);
     }
 
+    // Okresowe wysyłanie poleceń do odkrytych serwerów
+    while (1) {
+        send_command_to_server(sockfd);
+        usleep((1500 + rand() % 1001) * 1000);  // Losowe opóźnienie między 1500 a 2500 ms
+    }
+
     close(sockfd);
     return 0;
 }
