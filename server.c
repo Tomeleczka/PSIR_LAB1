@@ -53,14 +53,16 @@ int main() {
     char hello_message[HEADER_SIZE];
     create_header(hello_message, HELLO_MSG, server_id);
     
-    // Target client IP instead of broadcast
-    struct sockaddr_in target_client_addr;
-    memset(&target_client_addr, 0, sizeof(target_client_addr));
-    target_client_addr.sin_family = AF_INET;
-    target_client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");  // Specific client IP
-    target_client_addr.sin_port = htons(UDP_PORT);
+    
 
     while (1) {
+        // Target client IP instead of broadcast
+        struct sockaddr_in target_client_addr;
+        memset(&target_client_addr, 0, sizeof(target_client_addr));
+        target_client_addr.sin_family = AF_INET;
+        target_client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");  // Specific client IP
+        target_client_addr.sin_port = htons(UDP_PORT);
+
         // Send HELLO message directly to the client
         if (sendto(sockfd, hello_message, strlen(hello_message), 0, (struct sockaddr *)&target_client_addr, sizeof(target_client_addr)) < 0) {
             perror("Error sending HELLO message");
