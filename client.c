@@ -120,7 +120,7 @@ int main() {
     // Powiązanie gniazda z dowolnym adresem na określonym porcie UDP
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = INADDR_ANY;
+    client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");
     client_addr.sin_port = htons(UDP_PORT);
     if (bind(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
         perror("Błąd podczas bindowania");
