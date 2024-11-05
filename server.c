@@ -58,7 +58,7 @@ int main() {
         struct sockaddr_in broadcast_addr;
         memset(&broadcast_addr, 0, sizeof(broadcast_addr));
         broadcast_addr.sin_family = AF_INET;
-        broadcast_addr.sin_addr.s_addr = inet_addr("192.168.56.225"); // Adres rozgłoszeniowy
+        broadcast_addr.sin_addr.s_addr = inet_addr("192.168.56.108"); // Adres rozgłoszeniowy
         broadcast_addr.sin_port = htons(UDP_PORT);
 
         int broadcastEnable = 1;
