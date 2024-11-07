@@ -16,6 +16,36 @@
 #define CMD_LENGTH 23
 #define MAX_SERVERS 10
 
+// Funkcja zwracająca losową wartość z danego zakresu (od min do max)
+// Potrzebna do losowego czasu wysłania wiadomości, poniżej przykład zastosowania (w środku main!!!)
+//    int min = 1500, max = 2150;
+//    int rd_num = timeRandoms(min, max)
+int timeRandoms(int min, int max) {
+    //printf("Random number between %d and %d: ", min, max);
+    unsigned int seed = time(0);
+    int rd_num = rand_r(&seed) % (max - min + 1) + min;
+    //printf("%d ", rd_num);
+    return rd_num;
+}
+
+//Funkcja generująca losowy 21-elementowy ciąg znaków
+//Uwaga trzeba pamiętać że tablica jest statyczna
+//Poniżej przykład użycia w main:
+//srand((unsigned int) time(NULL));  
+//printf("%s\n", generate_random_string());  
+char *generate_random_string() {
+    static char str[22];               
+    char charset[] = "0123456789"
+                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    size_t length = 21;
+    for (size_t i = 0; i < length; i++) {
+        size_t index = (double) rand() / RAND_MAX * (sizeof charset - 1);
+        str[i] = charset[index];
+    }
+    str[length] = '\0';                
+    return str;                        
+}
+
 // Struktura przechowująca informacje o serwerze
 typedef struct
 {
@@ -142,6 +172,34 @@ void get_active_ids(void) {
             printf("%s\n", dictionary[i].id);
         }
     }
+}
+
+// Funkcja zwracająca losowy serwer z flagą ustawioną na true
+// Przykład użycia w main:
+// Server losowy_server = get_random_active_server();
+Server get_random_active_server(void) {
+    // Tablica do przechowywania indeksów serwerów z aktywną flagą
+    int active_servers[MAX_SERVERS];
+    int active_count = 0;
+    // Zbieramy serwery, których flaga jest ustawiona na true
+    for (int i = 0; i < server_count; i++) {
+        if (dictionary[i].flag) {
+            active_servers[active_count++] = i;
+        }
+    }
+    // Jeśli nie ma aktywnych serwerów, zwróć pustą strukturę lub odpowiednią wartość
+    if (active_count == 0) {
+        printf("Brak aktywnych serwerów.\n");
+        Server empty_server = {0};  // Tworzymy pusty serwer
+        return empty_server;  // Zwracamy pustą strukturę
+    }
+    // Losujemy jeden serwer z aktywnych serwerów
+    srand(time(NULL));  // Inicjalizowanie generatora liczb losowych
+    int random_index = rand() % active_count;
+    // Zwracamy losowy serwer i przy okazji printuje go 
+    printf("Wylosowany aktywny serwer: %s, IP: %s, Port: %d\n", 
+    dictionary[active_servers[random_index]].id, dictionary[active_servers[random_index]].ip, dictionary[active_servers[random_index]].port);
+    return dictionary[active_servers[random_index]];
 }
 
 // Funkcja pomocnicza do printowania słownika
