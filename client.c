@@ -5,16 +5,26 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include <stdbool.h>
+#include <signal.h>
 
 #define UDP_PORT 1204
 #define BUFFER_SIZE 256
 #define HELLO_MSG "HELLO"
 #define CMD_MSG "CMD"
-#define RESPONSE_MSG "RESPONSE"
-#define STATUS_MSG "STATUS"
-#define HEADER_SIZE 10
-#define CMD_LENGTH 23
 #define MAX_SERVERS 10
+#define HEADER_SIZE 10
+#define INET_ADDRSTRLEN 16 
+
+
+int sockfd;
+
+// Funkcja, która obsługuje `Ctrl + C` (SIGINT) i `Ctrl + Z` (SIGTSTP) :D
+void handle_exit(int signo) {
+    printf("Closing client and releasing resources...\n");
+    close(sockfd);
+    printf("Exiting program...\n");
+    exit(0);
+}
 
 // Funkcja zwracająca losową wartość z danego zakresu (od min do max)
 // Potrzebna do losowego czasu wysłania wiadomości, poniżej przykład zastosowania (w środku main!!!)
@@ -60,12 +70,27 @@ int server_count = 0;
 static int last_id = 0;
 
 // Funkcja generująca unikalne ID
-const char* generate_unique_id(void) {
+const char *generate_unique_id(void) {
     static char id_buffer[32];
     
     last_id++;
     snprintf(id_buffer, sizeof(id_buffer), "ID%d", last_id);
     return id_buffer;
+}
+
+// Funkcja zmieniająca flagę serwera
+void change_flag(const char *id, bool new_flag)
+{
+    for (int i = 0; i < server_count; i++)
+    {
+        if (strcmp(dictionary[i].id, id) == 0)
+        {
+            dictionary[i].flag = new_flag;
+            printf("Zmieniono flagę serwera o ID %s na %s\n", id, new_flag ? "true" : "false");
+            return;
+        }
+    }
+    printf("Nie znaleziono serwera o ID %s\n", id);
 }
 
 // Funkcja dodająca serwer do listy, jeśli jeszcze nie jest na liście
@@ -87,6 +112,11 @@ void add_server(const char *ip, int port)
         }
         Server *new_server = &dictionary[server_count];
         const char *new_id = generate_unique_id();
+        if (new_id == NULL) {
+            printf("Błąd: Nie można wygenerować unikalnego ID dla serwera\n");
+            return;
+        }
+
         new_server->id = strdup(new_id);
         strncpy(new_server->ip, ip, INET_ADDRSTRLEN);
         new_server->ip[INET_ADDRSTRLEN - 1] = '\0';
@@ -101,35 +131,23 @@ void add_server(const char *ip, int port)
     }
 }
 
-// Funkcja zmieniająca flagę serwera
-void change_flag(const char *id, bool new_flag)
-{
-    for (int i = 0; i < server_count; i++)
-    {
-        if (strcmp(dictionary[i].id, id) == 0)
-        {
-            dictionary[i].flag = new_flag;
-            printf("Zmieniono flagę serwera o ID %s na %s\n", id, new_flag ? "true" : "false");
-            return;
-        }
-    }
-    printf("Nie znaleziono serwera o ID %s\n", id);
-}
+
 
 // Funkcja wysyłająca wiadomość HELLO do określonego serwera
-void send_hello_to_server(int sockfd, struct sockaddr_in *server_addr)
-{
-    char hello_msg[HEADER_SIZE];
-    snprintf(hello_msg, HEADER_SIZE, "%s", HELLO_MSG);
-    if (sendto(sockfd, hello_msg, strlen(hello_msg), 0, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0)
-    {
-        perror("Błąd podczas wysyłania wiadomości HELLO");
-    }
-}
+// void send_hello_to_server(int sockfd, struct sockaddr_in *server_addr)
+// {
+//     char hello_msg[HEADER_SIZE];
+//     snprintf(hello_msg, HEADER_SIZE, "%s", HELLO_MSG);
+//     if (sendto(sockfd, hello_msg, strlen(hello_msg), 0, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0)
+//     {
+//         perror("Błąd podczas wysyłania wiadomości HELLO");
+//     }
+// }
 
 // Funkcja sprawdzająca komunikaty od serwerów
 void check_servers(int sockfd)
 {
+    printf("Czekam!");
     struct sockaddr_in addr;
     socklen_t addr_len = sizeof(addr);
     char buffer[BUFFER_SIZE];
@@ -145,21 +163,21 @@ void check_servers(int sockfd)
         }
 
         buffer[received_len] = '\0';
+
         char server_ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &addr.sin_addr, server_ip, INET_ADDRSTRLEN);
         printf("Otrzymano wiadomość od serwera IP: %s, Wiadomość: %s\n", server_ip, buffer);
 
         // Parsowanie nagłówka i obsługa wiadomości
-        char msg_type[HEADER_SIZE];
+        char msg_type[HEADER_SIZE] = {0};
         sscanf(buffer, "%9s", msg_type);
-        if (strcmp(msg_type, HELLO_MSG) == 0)
-        {
-            add_server(server_ip, ntohs(addr.sin_port)); // Dodajemy nowy serwer do listy
-            send_hello_to_server(sockfd, &addr);         // Wysyłamy wiadomość HELLO do serwera
-        }
-        else if (strcmp(msg_type, RESPONSE_MSG) == 0)
-        {
-            printf("Otrzymano odpowiedź od serwera: %s\n", buffer);
+
+        if (strcmp(msg_type, HELLO_MSG) == 0){
+            printf("HELLO received\n");
+            add_server(server_ip, ntohs(addr.sin_port));    // Dodajemy nowy serwer do listy
+            // send_hello_to_server(sockfd, &addr);         // Wysyłamy wiadomość HELLO do serwera
+        } else {
+            printf("Received non-HELLO message: '%s'\n", msg_type);
         }
     }
 }
@@ -214,10 +232,18 @@ void print_dictionary(void) {
     }
 }
 
-int main()
-{
+int main(){
+
+    if (signal(SIGINT, handle_exit) == SIG_ERR) {
+        perror("Error setting SIGINT handler\n");
+        return EXIT_FAILURE;
+    }
+    // if (signal(SIGTSTP, handle_exit) == SIG_ERR) {
+    //     perror("Error setting SIGTSTP handler");
+    //     return EXIT_FAILURE;
+    // }
+
     srand(time(NULL));
-    int sockfd;
     struct sockaddr_in client_addr;
 
     // Tworzenie gniazda UDP
@@ -228,24 +254,34 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    // Powiązanie z określonym adresem IP klienta
+    // Set the SO_REUSEADDR option on the socket - zabij mnie, może to sprawia problemy, to ostatecznie killuje klienta
+    int reuse = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        perror("Error setting SO_REUSEADDR");
+        close(sockfd);
+        return EXIT_FAILURE;
+    }
+
+    // ???
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");
+    client_addr.sin_addr.s_addr = INADDR_ANY;
     client_addr.sin_port = htons(UDP_PORT);
-    if (bind(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0)
-    {
+
+    if (bind(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0){
         perror("Błąd podczas bindowania");
         close(sockfd);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     printf("Klient uruchomiony, oczekiwanie na wiadomości HELLO...\n");
 
     // Uruchamiamy proces potomny do odbierania wiadomości od serwerów
-    if (fork() == 0)
-    {
+    if (fork() == 0) {
+        
         check_servers(sockfd);
+        printf("Czy check_servers w ogóle działa?\n");
+        close(sockfd);
         exit(0);
     }
 
