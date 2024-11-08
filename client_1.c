@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <stdbool.h>
+#include <sys/time.h>
 
 #define UDP_PORT 3605
 #define BUFFER_SIZE 256
@@ -251,7 +252,7 @@ void* send_ping_thread(void* arg) {
     return NULL;
 }
 
-void pong_recieve(const char *ip, int port){
+void pong_receive(const char *ip, int port){
 
     printf("Otrzymanie PONG...\n");
     for (int i = 0; i < server_count; i++) {
@@ -260,6 +261,52 @@ void pong_recieve(const char *ip, int port){
             printf("Zmieniono flagę serwera IP: %s, Port: %d na false\n", ip, port);
             return;
         }
+    }
+}
+
+void check_for_pong_timeout(int sockfd) {
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 410000;  // 410 milliseconds
+
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(sockfd, &read_fds);
+
+    // Wait for data with a timeout
+    int result = select(sockfd + 1, &read_fds, NULL, NULL, &timeout);
+
+    if (result == 0) {
+        // Timeout occurred, no response within 410 ms
+        printf("Brak odpowiedzi PONG, oznaczam serwery jako nieaktywne.\n");
+        for (int i = 0; i < server_count; i++) {
+            if (dictionary[i].flag) {
+                change_flag(dictionary[i].id, false);
+                printf("Serwer %s, IP: %s, Port: %d oznaczony jako nieaktywny\n",
+                       dictionary[i].id, dictionary[i].ip, dictionary[i].port);
+            }
+        }
+    } else if (result > 0 && FD_ISSET(sockfd, &read_fds)) {
+        // There is data to read, call the function that handles receiving PONG
+        struct sockaddr_in server_addr;
+        socklen_t addr_len = sizeof(server_addr);
+        char buffer[BUFFER_SIZE];
+
+        int received_len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&server_addr, &addr_len);
+        if (received_len < 0) {
+            perror("Błąd podczas odbierania danych");
+            return;
+        }
+
+        buffer[received_len] = '\0';
+        char msg_type[HEADER_SIZE];
+        sscanf(buffer, "%9s", msg_type);
+
+        if (strcmp(msg_type, PONG_MSG) == 0) {
+            pong_receive(inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
+        }
+    } else {
+        perror("Błąd podczas oczekiwania na dane");
     }
 }
 
@@ -327,13 +374,11 @@ int main()
         // Parsowanie nagłówka i obsługa wiadomości
         char msg_type[HEADER_SIZE];
         sscanf(buffer, "%9s", msg_type);
-        if (strcmp(msg_type, HELLO_MSG) == 0)
-        {
-            add_server(server_ip, ntohs(server_addr.sin_port)); // Sprawdzamy serwer
-        } 
-        else if (strcmp(msg_type, PONG_MSG) == 0)
-        {
-            pong_recieve(server_ip, ntohs(server_addr.sin_port));
+        if (strcmp(msg_type, HELLO_MSG) == 0) {
+            add_server(server_ip, ntohs(server_addr.sin_port)); // Add server on HELLO
+            check_for_pong_timeout(sockfd);  // Check for PONG within 410 ms
+        } else if (strcmp(msg_type, PONG_MSG) == 0) {
+            pong_receive(server_ip, ntohs(server_addr.sin_port));  // Process PONG
         }
     }
 
