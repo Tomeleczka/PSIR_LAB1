@@ -11,18 +11,17 @@
 #define HELLO_MSG "HELLO"
 #define CMD_MSG "CMD"
 #define PONG_MSG "PONG"
-#define HEADER_SIZE 10
 #define PING_MSG "PING"
 #define CMD_MSG "CMD"
-#define CMD_LENGTH 26
 #define EXE_MSG "EXE"
+
+#define HEADER_SIZE 10
+#define CMD_LENGTH 26
 #define EXE_LENGTH 29
 
 int timeRandoms(int min, int max) {
-    //printf("Random number between %d and %d: ", min, max);
     unsigned int seed = time(0);
     int rd_num = rand_r(&seed) % (max - min + 1) + min;
-    //printf("%d ", rd_num);
     return rd_num;
 }
 
@@ -33,7 +32,6 @@ void ping_receive(){
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
     printf("Otrzymanie PING...\n");
-    //char message[] = "Ping";
 
     // Przygotowanie adresu klienta, aby wysłać wiadomość
     memset(&client_addr, 0, sizeof(client_addr));
@@ -41,9 +39,7 @@ void ping_receive(){
     client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");
     client_addr.sin_port = htons(UDP_PORT);
                 
-    // Wysyłamy Pong
-    // char pong_msg[HEADER_SIZE];
-    // snprintf(pong_msg, HEADER_SIZE, "%s", PONG_MSG);
+    // Wysyłamy PONG
     if (sendto(sockfd, PONG_MSG, strlen(PONG_MSG), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0)
     {
         perror("Błąd wysyłania PONG\n");
@@ -71,7 +67,7 @@ int main() {
 
     // Powiązanie gniazda z określonym portem UDP
     if (bind(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("bind");
+        perror("Zły bind!\n");
         exit(EXIT_FAILURE);
     }
 
@@ -85,9 +81,9 @@ int main() {
 
     // Wysłanie wiadomość powitalnej HELLO do klienta
      if (sendto(sockfd, HELLO_MSG, strlen(HELLO_MSG), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
-        perror("Error sending HELLO message");
+        perror("Błąd wysyłania HELLO\n");
     } else {
-        printf("Sent HELLO message to client at 192.168.56.108\n");
+        printf("Wysłanie HELLO wiadomości do klienta 192.168.56.108\n");
     }
 
     while (1) {
@@ -96,7 +92,7 @@ int main() {
         
         // Obsłużenie błędy przy odbiorze wiadomości
         if (received_len < 0) {
-            perror("Error receiving data");
+            perror("Błąd otrzymania danych");
             continue;
         }
 
@@ -127,9 +123,9 @@ int main() {
             char exe_msg[EXE_LENGTH];
             snprintf(exe_msg, sizeof(exe_msg), "%s %d%s", EXE_MSG, random_int, cmd_series);
             if (sendto(sockfd, exe_msg, strlen(exe_msg), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
-                perror("Error sending EXE message");
+                perror("Błąd wysyłania wiadomości EXE\n");
             } else {
-                printf("Sent EXE message to client at 192.168.56.108\n");
+                printf("Wysłanie EXE wiadomości do klienta 192.168.56.108\n");
             }
         }
     }
