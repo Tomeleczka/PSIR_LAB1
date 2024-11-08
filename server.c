@@ -12,14 +12,24 @@
 #define CMD_MSG "CMD"
 #define PONG_MSG "PONG"
 #define HEADER_SIZE 10
+#define PING_MSG "PING"
+#define CMD_MSG "CMD"
+
+int timeRandoms(int min, int max) {
+    //printf("Random number between %d and %d: ", min, max);
+    unsigned int seed = time(0);
+    int rd_num = rand_r(&seed) % (max - min + 1) + min;
+    //printf("%d ", rd_num);
+    return rd_num;
+}
 
 int sockfd;
+struct sockaddr_in server_addr, client_addr;
 
 void ping_receive(){
-    struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
-    printf("Otrzymanie PONG...\n");
+    printf("Otrzymanie PING...\n");
     //char message[] = "Ping";
 
     // Przygotowanie adresu klienta, aby wysłać wiadomość
@@ -29,18 +39,17 @@ void ping_receive(){
     client_addr.sin_port = htons(UDP_PORT);
                 
     // Wysyłamy Pong
-    char pong_msg[HEADER_SIZE];
-    snprintf(pong_msg, HEADER_SIZE, "%s", PONG_MSG);
-    if (sendto(sockfd, pong_msg, strlen(pong_msg), 0, (struct sockaddr *)client_addr, sizeof(*client_addr)) < 0)
+    // char pong_msg[HEADER_SIZE];
+    // snprintf(pong_msg, HEADER_SIZE, "%s", PONG_MSG);
+    if (sendto(sockfd, PONG_MSG, strlen(PONG_MSG), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0)
     {
         perror("Błąd wysyłania PONG\n");
     }
-    
 }
 
 int main() {
     int server_id = getpid();  // Unikalne ID serwera na podstawie PID
-    struct sockaddr_in server_addr, client_addr;
+    
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
     
@@ -99,31 +108,12 @@ int main() {
         // Parsowanie nagłówka i obsługa wiadomości
         char msg_type[HEADER_SIZE];
         sscanf(buffer, "%9s", msg_type);
-        if (strcmp(msg_type, PONG_MSG) == 0) {
+        if (strcmp(msg_type, PING_MSG) == 0) {
             ping_receive();  // Process PONG
-        }
-    }
+        // } else if (strcmp(msg_type, CMD_MSG) == 0){
 
-        // // Parsowanie typu wiadomości
-        // char msg_type[HEADER_SIZE];
-        // sscanf(buffer, "%9s", msg_type);
-        
-        // if (strcmp(msg_type, CMD_MSG) == 0) {
-        //     // Odczytanie polecenia z wiadomości, pomijając nagłówek
-        //     char *cmd_content = buffer + HEADER_SIZE;
-        //     printf("Otrzymano polecenie: %s\n", cmd_content);
-
-        //     // Generowanie odpowiedzi, zawierającej ID serwera
-        //     char response[BUFFER_SIZE];
-        //     snprintf(response, BUFFER_SIZE, "%s %s z ID %s", CMD_MSG, cmd_content, server_id);
-
-        //     // Wysłanie odpowiedzi do klienta
-        //     if (sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)client_addr, sizeof(*client_addr)) < 0) {
-        //         perror("Error przy wysłaniu");
-        //     } else {
-        //         printf("Wysłano odpowiedź: '%s' do klienta %s:%d\n", response, inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
-        //     }
         // }
+    }
     close(sockfd);
     return 0;
-    }
+}

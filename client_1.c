@@ -16,6 +16,7 @@
 #define CMD_LENGTH 23
 #define MAX_SERVERS 10
 #define PONG_MSG "PONG"
+#define PING_MSG "PING"
 
 #define PING_INTERVAL_MS 410
 #define PONG_TIMEOUT_MS 100
@@ -59,7 +60,10 @@ typedef struct
     int port;
     char *id;
     bool flag;
+    time_t last_ping_time;
 } Server;
+
+
 
 Server dictionary[MAX_SERVERS];
 int server_count = 0;
@@ -74,9 +78,20 @@ const char* generate_unique_id(void) {
     return id_buffer;
 }
 
+int count_non_null_servers() {
+    int count = 0;
+    for (int i = 0; i < MAX_SERVERS; i++) {
+        if (dictionary[i].id != NULL) {
+            count++;
+        }
+    }
+    return count;
+}
+
 // Funkcja zmieniająca flagę serwera
 void change_flag(const char *id, bool new_flag)
 {
+    server_count = count_non_null_servers();
     for (int i = 0; i < server_count; i++)
     {
         if (strcmp(dictionary[i].id, id) == 0)
@@ -107,6 +122,7 @@ void add_server(const char *ip, int port)
     for (int i = 0; i < server_count; i++) {
         if (strcmp(dictionary[i].ip, ip) == 0 && dictionary[i].port == port) {
             change_flag(dictionary[i].id, true);
+            dictionary[i].last_ping_time = time(NULL);
             return;
         }
     }
@@ -121,6 +137,7 @@ void add_server(const char *ip, int port)
     strncpy(new_server->ip, ip, INET_ADDRSTRLEN);
     new_server->port = port;
     new_server->flag = true;
+    new_server->last_ping_time = time(NULL); 
 
     server_count++;
     printf("%d\n", server_count);
@@ -193,9 +210,8 @@ void send_cmd_to_random_server() {
         inet_pton(AF_INET, random_server.ip, &server_addr.sin_addr);
 
         // Create CMD message
-        char cmd_msg[HEADER_SIZE + CMD_LENGTH];
+        char cmd_msg[CMD_LENGTH];
         snprintf(cmd_msg, sizeof(cmd_msg), "%s %s", CMD_MSG, generate_random_string());
-
         if (sendto(sockfd, cmd_msg, strlen(cmd_msg), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
             perror("Błąd podczas wysyłania wiadomości CMD");
         } else {
@@ -207,23 +223,27 @@ void send_cmd_to_random_server() {
     }
 }
 
-// Thread function to periodically send CMD messages
-void* cmd_sender_thread(void* arg) {
-    while (1) {
-        int min_time = 1500, max_time = 2150;
-        int random_time = timeRandoms(min_time, max_time);
-        usleep(random_time * 1000);  // Convert to microseconds
-
-        send_cmd_to_random_server();
+void update_server_timeouts(void) {
+    time_t current_time = time(NULL);
+    server_count = count_non_null_servers();
+    // printf("%d\n", server_count);
+    for (int i = 0; i < server_count; i++) {
+        if (dictionary[i].flag && difftime(current_time, dictionary[i].last_ping_time) > 1) {
+            // Mark server as inactive if it hasn’t responded within 410 ms
+            change_flag(dictionary[i].id, false);
+            printf("Serwer %s, IP: %s, Port: %d oznaczony jako nieaktywny (timeout).\n",
+                   dictionary[i].id, dictionary[i].ip, dictionary[i].port);
+        }
     }
-    return NULL;
 }
+
+
 
 // Funkcja wysyłająca wiadomość CMD_MSG do losowego aktywnego serwera
 void send_ping_to_servers() {
     struct sockaddr_in server_addr;
     socklen_t addr_len = sizeof(server_addr);
-    char message[] = "Ping";
+    // char message[] = "Ping";
     char buffer[BUFFER_SIZE];
 
     for (int i = 0; i < server_count; i++) {
@@ -235,12 +255,24 @@ void send_ping_to_servers() {
             inet_pton(AF_INET, dictionary[i].ip, &server_addr.sin_addr);
                 
             // Wysyłamy Ping
-            if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)&server_addr, addr_len) < 0) {
+            if (sendto(sockfd, PING_MSG, strlen(PING_MSG), 0, (struct sockaddr *)&server_addr, addr_len) < 0) {
                 perror("Błąd przy wysłaniu Ping");
                 continue;
             }
         }
     }              
+}
+
+// Thread function to periodically send CMD messages
+void* cmd_sender_thread(void* arg) {
+    while (1) {
+        int min_time = 1500, max_time = 2150;
+        int random_time = timeRandoms(min_time, max_time);
+        usleep(random_time * 1000);  // Convert to microseconds
+        send_cmd_to_random_server();
+
+    }
+    return NULL;
 }
 
 // Wątek dla ping :)
@@ -252,61 +284,23 @@ void* send_ping_thread(void* arg) {
     return NULL;
 }
 
-void pong_receive(const char *ip, int port){
-
-    printf("Otrzymanie PONG...\n");
-    for (int i = 0; i < server_count; i++) {
-        if (strcmp(dictionary[i].ip, ip) == 0 && dictionary[i].port == port) {
-            change_flag(dictionary[i].id, false);
-            printf("Zmieniono flagę serwera IP: %s, Port: %d na false\n", ip, port);
-            return;
-        }
+void* timeout_send_thread(void* arg) {
+    while (1) {
+        usleep(500 * 100);
+        update_server_timeouts();
     }
+    return NULL;
 }
 
-void check_for_pong_timeout(int sockfd) {
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 410000;  // 410 milliseconds
-
-    fd_set read_fds;
-    FD_ZERO(&read_fds);
-    FD_SET(sockfd, &read_fds);
-
-    // Wait for data with a timeout
-    int result = select(sockfd + 1, &read_fds, NULL, NULL, &timeout);
-
-    if (result == 0) {
-        // Timeout occurred, no response within 410 ms
-        printf("Brak odpowiedzi PONG, oznaczam serwery jako nieaktywne.\n");
-        for (int i = 0; i < server_count; i++) {
-            if (dictionary[i].flag) {
-                change_flag(dictionary[i].id, false);
-                printf("Serwer %s, IP: %s, Port: %d oznaczony jako nieaktywny\n",
-                       dictionary[i].id, dictionary[i].ip, dictionary[i].port);
-            }
-        }
-    } else if (result > 0 && FD_ISSET(sockfd, &read_fds)) {
-        // There is data to read, call the function that handles receiving PONG
-        struct sockaddr_in server_addr;
-        socklen_t addr_len = sizeof(server_addr);
-        char buffer[BUFFER_SIZE];
-
-        int received_len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&server_addr, &addr_len);
-        if (received_len < 0) {
-            perror("Błąd podczas odbierania danych");
+void pong_receive(const char *ip, int port){
+    server_count = count_non_null_servers();
+    printf("Otrzymanie PONG...\n");
+    for (int i = 0; i < server_count; i++) {
+        if (dictionary[i].flag && strcmp(dictionary[i].ip, ip) == 0 && dictionary[i].port == port) {
+            dictionary[i].last_ping_time = time(NULL);  // Update last ping time on PONG
+            printf("Aktualizacja czasu ostatniego PONG dla serwera ID: %s\n", dictionary[i].id);
             return;
         }
-
-        buffer[received_len] = '\0';
-        char msg_type[HEADER_SIZE];
-        sscanf(buffer, "%9s", msg_type);
-
-        if (strcmp(msg_type, PONG_MSG) == 0) {
-            pong_receive(inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
-        }
-    } else {
-        perror("Błąd podczas oczekiwania na dane");
     }
 }
 
@@ -342,7 +336,7 @@ int main()
 
     // CMD_MSG
     pthread_t cmd_thread;
-    if (pthread_create(&cmd_thread, NULL, cmd_sender_thread, NULL) != 0) {
+    if (pthread_create(&cmd_thread, NULL, cmd_sender_thread, NULL) != 0){
         perror("Błąd podczas tworzenia wątku CMD");
         exit(EXIT_FAILURE);
     }
@@ -353,9 +347,16 @@ int main()
         perror("Błąd podczas tworzenia wątku PING");
         exit(EXIT_FAILURE);
     }
+
+    // TIMEOUT
+    pthread_t timeout_thread;
+    if (pthread_create(&timeout_thread, NULL, timeout_send_thread, NULL) != 0) {
+        perror("Błąd podczas timeout");
+        exit(EXIT_FAILURE);
+    }
+
     while (1)
     {
-
         // printf("Check\n");
         // Odbieranie wiadomości z gniazda
         int received_len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&server_addr, &addr_len);
@@ -376,15 +377,19 @@ int main()
         sscanf(buffer, "%9s", msg_type);
         if (strcmp(msg_type, HELLO_MSG) == 0) {
             add_server(server_ip, ntohs(server_addr.sin_port)); // Add server on HELLO
-            check_for_pong_timeout(sockfd);  // Check for PONG within 410 ms
         } else if (strcmp(msg_type, PONG_MSG) == 0) {
-            pong_receive(server_ip, ntohs(server_addr.sin_port));  // Process PONG
+            pong_receive(server_ip, ntohs(server_addr.sin_port));  // Update last_ping_time on PONG
+            printf("KOCHAM PRUSZKOWSKIEGO\n");
         }
+        //update_server_timeouts();
+       
     }
 
     // Clean up
     pthread_cancel(cmd_thread);
     pthread_join(cmd_thread, NULL);
+    pthread_cancel(timeout_thread);
+    pthread_join(timeout_thread, NULL);
     pthread_cancel(ping_thread);
     pthread_join(ping_thread, NULL);
     // Zamknięcie gniazda po zakończeniu
