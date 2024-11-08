@@ -11,10 +11,35 @@
 #define HELLO_MSG "HELLO"
 #define CMD_MSG "CMD"
 #define PONG_MSG "PONG"
+#define HEADER_SIZE 10
+
+int sockfd;
+
+void ping_receive(){
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    char buffer[BUFFER_SIZE];
+    printf("Otrzymanie PONG...\n");
+    //char message[] = "Ping";
+
+    // Przygotowanie adresu klienta, aby wysłać wiadomość
+    memset(&client_addr, 0, sizeof(client_addr));
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");
+    client_addr.sin_port = htons(UDP_PORT);
+                
+    // Wysyłamy Pong
+    char pong_msg[HEADER_SIZE];
+    snprintf(pong_msg, HEADER_SIZE, "%s", PONG_MSG);
+    if (sendto(sockfd, pong_msg, strlen(pong_msg), 0, (struct sockaddr *)client_addr, sizeof(*client_addr)) < 0)
+    {
+        perror("Błąd wysyłania PONG\n");
+    }
+    
+}
 
 int main() {
     int server_id = getpid();  // Unikalne ID serwera na podstawie PID
-    int sockfd;
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
@@ -72,11 +97,11 @@ int main() {
         printf("Otrzymano wiadomość od klienta IP: %s, Wiadomość: %s\n", client_ip, buffer);
 
         // Parsowanie nagłówka i obsługa wiadomości
-        // char msg_type[HEADER_SIZE];
-        // sscanf(buffer, "%9s", msg_type);
-        // if (strcmp(msg_type, PONG_MSG) == 0)
-        // {
-        //     printf("LOL\n");
+        char msg_type[HEADER_SIZE];
+        sscanf(buffer, "%9s", msg_type);
+        if (strcmp(msg_type, PONG_MSG) == 0) {
+            ping_receive();  // Process PONG
+        }
     }
 
         // // Parsowanie typu wiadomości
