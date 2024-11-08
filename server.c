@@ -10,6 +10,7 @@
 #define BUFFER_SIZE 256
 #define HELLO_MSG "HELLO"
 #define CMD_MSG "CMD"
+#define PONG_MSG "PONG"
 
 int main() {
     int server_id = getpid();  // Unikalne ID serwera na podstawie PID
@@ -70,6 +71,14 @@ int main() {
         inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
         printf("Otrzymano wiadomość od klienta IP: %s, Wiadomość: %s\n", client_ip, buffer);
 
+        // Parsowanie nagłówka i obsługa wiadomości
+        // char msg_type[HEADER_SIZE];
+        // sscanf(buffer, "%9s", msg_type);
+        // if (strcmp(msg_type, PONG_MSG) == 0)
+        // {
+        //     printf("LOL\n");
+    }
+
         // // Parsowanie typu wiadomości
         // char msg_type[HEADER_SIZE];
         // sscanf(buffer, "%9s", msg_type);
@@ -90,11 +99,6 @@ int main() {
         //         printf("Wysłano odpowiedź: '%s' do klienta %s:%d\n", response, inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
         //     }
         // }
-    }
-
-    
-
-    // Zamknięcie gniazda po zakończeniu pracy
     close(sockfd);
     return 0;
-}
+    }
