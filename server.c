@@ -73,27 +73,26 @@ int main() {
         // // Parsowanie typu wiadomości
         // char msg_type[HEADER_SIZE];
         // sscanf(buffer, "%9s", msg_type);
+        
+        // if (strcmp(msg_type, CMD_MSG) == 0) {
+        //     // Odczytanie polecenia z wiadomości, pomijając nagłówek
+        //     char *cmd_content = buffer + HEADER_SIZE;
+        //     printf("Otrzymano polecenie: %s\n", cmd_content);
 
-        // // Sprawdzenie typu wiadomości i odpowiednie działanie
-        // if (strcmp(msg_type, HELLO_MSG) == 0) {
-        //     printf("Otrzymano wiadomość HELLO od klienta.\n");
-        //     // Przygotowanie i wysłanie odpowiedzi HELLO do klienta
-        //     char response_header[HEADER_SIZE];
-        //     create_header(response_header, RESPONSE_MSG, server_id);
-        //     sendto(sockfd, response_header, strlen(response_header), 0, (struct sockaddr *)&client_addr, addr_len);
-        
-        // } else if (strcmp(msg_type, CMD_MSG) == 0) {
-        //     // Wyświetlenie otrzymanego polecenia
-        //     printf("Otrzymano polecenie: %s\n", buffer + HEADER_SIZE);
-        
-        // } else if (strcmp(msg_type, STATUS_MSG) == 0) {
-        //     // Wysłanie odpowiedzi STATUS do klienta
-        //     printf("Otrzymano żądanie STATUS od klienta.\n");
-        //     char status_response[HEADER_SIZE];
-        //     create_header(status_response, STATUS_MSG, server_id);
-        //     sendto(sockfd, status_response, strlen(status_response), 0, (struct sockaddr *)&client_addr, addr_len);
+        //     // Generowanie odpowiedzi, zawierającej ID serwera
+        //     char response[BUFFER_SIZE];
+        //     snprintf(response, BUFFER_SIZE, "%s %s z ID %s", CMD_MSG, cmd_content, server_id);
+
+        //     // Wysłanie odpowiedzi do klienta
+        //     if (sendto(sockfd, response, strlen(response), 0, (struct sockaddr *)client_addr, sizeof(*client_addr)) < 0) {
+        //         perror("Error przy wysłaniu");
+        //     } else {
+        //         printf("Wysłano odpowiedź: '%s' do klienta %s:%d\n", response, inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
+        //     }
         // }
     }
+
+    
 
     // Zamknięcie gniazda po zakończeniu pracy
     close(sockfd);

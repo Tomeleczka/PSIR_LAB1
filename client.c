@@ -6,8 +6,9 @@
 #include <time.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <pthread.h>
 
-#define UDP_PORT 1204
+#define UDP_PORT 3605
 #define BUFFER_SIZE 256
 #define HELLO_MSG "HELLO"
 #define CMD_MSG "CMD"
@@ -15,13 +16,15 @@
 #define HEADER_SIZE 10
 #define INET_ADDRSTRLEN 16 
 
-
+// Definicja MUTEX ;)
+pthread_mutex_t dictionary_mutex = PTHREAD_MUTEX_INITIALIZER;
 int sockfd;
 
 // Funkcja, która obsługuje `Ctrl + C` (SIGINT) i `Ctrl + Z` (SIGTSTP) :D
 void handle_exit(int signo) {
     printf("Closing client and releasing resources...\n");
     close(sockfd);
+    pthread_mutex_destroy(&dictionary_mutex);
     printf("Exiting program...\n");
     exit(0);
 }
@@ -96,24 +99,28 @@ void change_flag(const char *id, bool new_flag)
 // Funkcja dodająca serwer do listy, jeśli jeszcze nie jest na liście
 void add_server(const char *ip, int port)
 {
-    // Sprawdzamy, czy serwer juz istnieje
+    pthread_mutex_lock(&dictionary_mutex);
+    printf("Serwer się dodaje...");
+    // Sprawdzamy, czy serwer już istnieje
     for (int i = 0; i < server_count; i++)
     {
         if (strcmp(dictionary[i].ip, ip) == 0 && dictionary[i].port == port)
         {
             change_flag(dictionary[i].id, true);
-
+            pthread_mutex_unlock(&dictionary_mutex);
             return;
         }
         if (server_count >= MAX_SERVERS)
         {
             printf("Error: Maksymalna liczba serwerów (%d) osiągnięta. Nie mozna dodac wiecej\n", MAX_SERVERS);
+            pthread_mutex_unlock(&dictionary_mutex);
             return;
         }
         Server *new_server = &dictionary[server_count];
         const char *new_id = generate_unique_id();
         if (new_id == NULL) {
             printf("Błąd: Nie można wygenerować unikalnego ID dla serwera\n");
+            pthread_mutex_unlock(&dictionary_mutex);
             return;
         }
 
@@ -129,25 +136,13 @@ void add_server(const char *ip, int port)
                new_server->id, new_server->ip, new_server->port,
                new_server->flag ? "true" : "false");
     }
+    pthread_mutex_unlock(&dictionary_mutex);
 }
 
-
-
-// Funkcja wysyłająca wiadomość HELLO do określonego serwera
-// void send_hello_to_server(int sockfd, struct sockaddr_in *server_addr)
-// {
-//     char hello_msg[HEADER_SIZE];
-//     snprintf(hello_msg, HEADER_SIZE, "%s", HELLO_MSG);
-//     if (sendto(sockfd, hello_msg, strlen(hello_msg), 0, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0)
-//     {
-//         perror("Błąd podczas wysyłania wiadomości HELLO");
-//     }
-// }
-
 // Funkcja sprawdzająca komunikaty od serwerów
-void check_servers(int sockfd)
-{
-    printf("Czekam!");
+void *check_servers(void *arg){
+    (void)arg;
+    // printf("Czekam!");
     struct sockaddr_in addr;
     socklen_t addr_len = sizeof(addr);
     char buffer[BUFFER_SIZE];
@@ -174,22 +169,28 @@ void check_servers(int sockfd)
 
         if (strcmp(msg_type, HELLO_MSG) == 0){
             printf("HELLO received\n");
+            pthread_mutex_lock(&dictionary_mutex);
             add_server(server_ip, ntohs(addr.sin_port));    // Dodajemy nowy serwer do listy
+            pthread_mutex_unlock(&dictionary_mutex);
             // send_hello_to_server(sockfd, &addr);         // Wysyłamy wiadomość HELLO do serwera
-        } else {
-            printf("Received non-HELLO message: '%s'\n", msg_type);
-        }
+        } 
+        // else {
+        //     printf("Received non-HELLO message: '%s'\n", msg_type);
+        // }
     }
+    return NULL;
 }
 
 // Funkcja, otrzymująca aktywne serwery
 void get_active_ids(void) {
+    pthread_mutex_lock(&dictionary_mutex);
     printf("ID z aktywną flagą:\n");
     for (int i = 0; i < server_count; i++) {
         if (dictionary[i].flag) {
             printf("%s\n", dictionary[i].id);
         }
     }
+    pthread_mutex_unlock(&dictionary_mutex);
 }
 
 // Funkcja zwracająca losowy serwer z flagą ustawioną na true
@@ -277,15 +278,38 @@ int main(){
     printf("Klient uruchomiony, oczekiwanie na wiadomości HELLO...\n");
 
     // Uruchamiamy proces potomny do odbierania wiadomości od serwerów
-    if (fork() == 0) {
-        
-        check_servers(sockfd);
-        printf("Czy check_servers w ogóle działa?\n");
+    // if (fork() == 0) {
+    //     check_servers(sockfd);
+    //     pthread_mutex_destroy(&dictionary_mutex); 
+    //     // printf("Czy check_servers w ogóle działa?\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+
+    pthread_t check_thread;
+    if (pthread_create(&check_thread, NULL, check_servers, NULL) != 0) {
+        perror("Error creating check_servers thread");
         close(sockfd);
-        exit(0);
+        return EXIT_FAILURE;
     }
+    pthread_join(check_thread, NULL);
 
     // Zamknięcie gniazda po zakończeniu
     close(sockfd);
+    pthread_mutex_destroy(&dictionary_mutex);
     return 0;
+
+    // !!!Można wykorzystać do wysyłania losowego ciągu!!!
+    // !!!
+    // char cmd_message[BUFFER_SIZE];
+    // snprintf(cmd_message, BUFFER_SIZE, "%s Hej_Kociaki", CMD_MSG);
+
+    // if (sendto(sockfd, cmd_message, strlen(cmd_message), 0, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    //     perror("Error sending CMD message");
+    // } else {
+    //     printf("Sent CMD message: '%s' to server %s:%d\n", cmd_message, ip, port);
+    // }
+    // !!!
+
+    
 }
