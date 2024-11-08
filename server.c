@@ -110,7 +110,8 @@ int main() {
         sscanf(buffer, "%9s", msg_type);
         if (strcmp(msg_type, PING_MSG) == 0) {
             ping_receive();  // Process PONG
-        // } else if (strcmp(msg_type, CMD_MSG) == 0){
+        } 
+        // else if (strcmp(msg_type, CMD_MSG) == 0){
 
         // }
     }
