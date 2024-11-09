@@ -17,9 +17,13 @@
 #define PING_MSG "PING"
 #define EXE_MSG "EXE"
 
-#define HEADER_SIZE 10
-#define CMD_LENGTH 26
-#define EXE_LENGTH 29
+#define HEADER_SIZE 10      // 10 znaków  na CMD_MSG, PONG_MSG, etc. + \n
+#define CMD_LENGTH 30      // HEADER_SIZE + 25 znaków
+#define EXE_LENGTH 32      // HEADER_SIZE + 28 znaków
+
+// #define HEADER_SIZE 10
+// #define CMD_LENGTH 26
+// #define EXE_LENGTH 29
 
 #define MAX_SERVERS 10
 
@@ -27,6 +31,19 @@ int sockfd;
 
 struct timespec send_time;
 struct timespec received_time;
+
+// Struktura przechowująca informacje o serwerze
+typedef struct{
+    char ip[INET_ADDRSTRLEN];
+    int port;
+    char *id;
+    bool flag;
+    time_t last_ping_time;
+} Server;
+
+Server dictionary[MAX_SERVERS];
+int server_count = 0;
+static int last_id = 0;
 
 // Funkcja zwracająca losową wartość z danego zakresu (od min do max)
 // Potrzebna do losowego czasu wysłania wiadomości, poniżej przykład zastosowania (w środku main!!!)
@@ -58,20 +75,6 @@ char *generate_random_string() {
     str[length] = '\0';                
     return str;                        
 }
-
-// Struktura przechowująca informacje o serwerze
-typedef struct
-{
-    char ip[INET_ADDRSTRLEN];
-    int port;
-    char *id;
-    bool flag;
-    time_t last_ping_time;
-} Server;
-
-Server dictionary[MAX_SERVERS];
-int server_count = 0;
-static int last_id = 0;
 
 // Funkcja generująca unikalne ID
 const char* generate_unique_id(void) {
@@ -120,8 +123,7 @@ void get_active_ids(void) {
 }
 
 // Funkcja dodająca serwer do listy, jeśli jeszcze nie jest na liście
-void add_server(const char *ip, int port)
-{
+void add_server(const char *ip, int port){
     printf("Serwer się dodaje...\n");
     // Sprawdzamy, czy serwer już istnieje
     for (int i = 0; i < server_count; i++) {
@@ -150,18 +152,6 @@ void add_server(const char *ip, int port)
            new_server->id, new_server->ip, new_server->port,
            new_server->flag ? "true" : "false");
     get_active_ids();
-}
-
-
-// Funkcja wysyłająca wiadomość HELLO do określonego serwera
-void send_hello_to_server(int sockfd, struct sockaddr_in *server_addr)
-{
-    char hello_msg[HEADER_SIZE];
-    snprintf(hello_msg, HEADER_SIZE, "%s", HELLO_MSG);
-    if (sendto(sockfd, hello_msg, strlen(hello_msg), 0, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0)
-    {
-        perror("Błąd podczas wysyłania wiadomości HELLO\n");
-    }
 }
 
 // Funkcja zwracająca losowy serwer z flagą ustawioną na true
@@ -329,9 +319,7 @@ void process_message(const char *exe_type, const char *exe_series) {
     }
 }
 
-
-int main()
-{
+int main(){
     srand(time(NULL));
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_len = sizeof(server_addr);
@@ -339,8 +327,7 @@ int main()
 
     // Tworzenie gniazda UDP
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0)
-    {
+    if (sockfd < 0){
         perror("Błąd podczas tworzenia gniazda\n");
         exit(EXIT_FAILURE);
     }
@@ -380,17 +367,14 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    while (1)
-    {
+    while (1){
         // printf("Check\n");
         // Odbieranie wiadomości z gniazda
         int received_len = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&server_addr, &addr_len);
-        if (received_len < 0)
-        {
+        if (received_len < 0){
             perror("Błąd podczas odbierania danych\n");
             continue;
         }
-
 
         buffer[received_len] = '\0';
         char server_ip[INET_ADDRSTRLEN];
@@ -411,7 +395,6 @@ int main()
         } else if (strcmp(exe_type, EXE_MSG) == 0){
             process_message(exe_type, exe_series);
         }
-       
     }
 
     // Czyszczenie
