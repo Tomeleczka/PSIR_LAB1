@@ -27,7 +27,7 @@ const char *client_ip = "192.168.56.108";
 // #define CMD_LENGTH 26
 // #define EXE_LENGTH 29
 
-int timeRandoms(int min, int max) {
+int integerRandoms(int min, int max) {
     unsigned int seed = time(0);
     int rd_num = rand_r(&seed) % (max - min + 1) + min;
     return rd_num;
@@ -138,7 +138,7 @@ int main() {
             if (strcmp(cmd_type, CMD_MSG) == 0) {
                 printf("Otrzyamnie CMD_MSG: %s\n", cmd_series);
 
-                int random_int = timeRandoms(100, 999);
+                int random_int = integerRandoms(100, 999);
 
                 char exe_msg[EXE_LENGTH];
                 snprintf(exe_msg, sizeof(exe_msg), "%s %d%s", EXE_MSG, random_int, cmd_series);
