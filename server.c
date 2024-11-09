@@ -16,10 +16,12 @@
 #define CMD_MSG "CMD"
 #define EXE_MSG "EXE"
 
-#define HEADER_SIZE 10      // 4 bajty na CMD_MSG, PONG_MSG, etc. + \n
-#define CMD_LENGTH 30      // HEADER_SIZE + 25 znaków
-#define EXE_LENGTH 32      // HEADER_SIZE + 28 znaków
-#define HELLO_LENGTH 12    // HEADER_SIZE + PID (maskymalna dłguość 5 znaków)!!!
+#define HEADER_SIZE 10      // CMD_MSG, PONG_MSG, etc. + \n
+#define CMD_LENGTH 30       // HEADER_SIZE + 25 znaków
+#define EXE_LENGTH 32       // HEADER_SIZE + 28 znaków
+#define HELLO_LENGTH 12     // HEADER_SIZE + PID (maskymalna dłguość 5 znaków)!!!
+
+const char *client_ip = "192.168.56.108";
 
 // #define HEADER_SIZE 10
 // #define CMD_LENGTH 26
@@ -37,12 +39,12 @@ struct sockaddr_in server_addr, client_addr;
 void ping_receive(){
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
-    printf("Otrzymanie PING...\n");
+    // printf("Otrzymanie PING...\n");
 
     // Przygotowanie adresu klienta, aby wysłać wiadomość
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");
+    client_addr.sin_addr.s_addr = inet_addr(client_ip);
     client_addr.sin_port = htons(UDP_PORT);
                 
     // Wysyłamy PONG
@@ -53,7 +55,9 @@ void ping_receive(){
 }
 
 int main() {
-    int server_id = getpid();  // Unikalne ID serwera na podstawie PID
+    
+
+    // int server_id = getpid();  // Unikalne ID serwera na podstawie PID
     
     socklen_t addr_len = sizeof(client_addr);
     char buffer[BUFFER_SIZE];
@@ -77,22 +81,22 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Serwer %d uruchomiony!\n", server_id);
+    printf("Serwer uruchomiony!\n");
 
     // Przygotowanie adresu klienta, aby wysłać wiadomość
     memset(&client_addr, 0, sizeof(client_addr));
     client_addr.sin_family = AF_INET;
-    client_addr.sin_addr.s_addr = inet_addr("192.168.56.108");
+    client_addr.sin_addr.s_addr = inet_addr(client_ip);
     client_addr.sin_port = htons(UDP_PORT);
 
     // Wysłanie wiadomość powitalnej HELLO do klienta
     char hello_msg[HELLO_LENGTH] = {0};
-    snprintf(hello_msg, sizeof(hello_msg), "%s %d", HELLO_MSG, server_id);
+    snprintf(hello_msg, sizeof(hello_msg), "%s", HELLO_MSG);
 
     if (sendto(sockfd, hello_msg, strlen(hello_msg), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
         perror("Błąd wysyłania HELLO\n");
     } else {
-        printf("Wysłano wiadomość HELLO do klienta 192.168.56.108: %s\n", hello_msg);
+        printf("Wysłano wiadomość HELLO do klienta %s: %s\n", client_ip, hello_msg);
     }
 
     while (1) {
@@ -132,7 +136,7 @@ int main() {
             // Kiedy na pewno nie PING sprawdzamy, czy COMMAND
             sscanf(buffer, "%9s %25s", cmd_type, cmd_series); 
             if (strcmp(cmd_type, CMD_MSG) == 0) {
-                printf("Received CMD series: %s\n", cmd_series);
+                printf("Otrzyamnie CMD_MSG: %s\n", cmd_series);
 
                 int random_int = timeRandoms(100, 999);
 
@@ -142,7 +146,7 @@ int main() {
                 if (sendto(sockfd, exe_msg, strlen(exe_msg), 0, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
                     perror("Błąd wysyłania wiadomości EXE");
                 } else {
-                    printf("Sent EXE message to client 192.168.56.108: %s\n", exe_msg);
+                    printf("Wiadomość EXE wysłana do klienta %s: %s\n", client_ip, exe_msg);
                 }
             }
         }
